@@ -45,11 +45,11 @@ app.use('/api', limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: config.frontendUrl,
-  credentials: true,
+  origin: "*",
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
 
 // Body parsing with size limits
 app.use(express.json({ limit: '10mb' }));
