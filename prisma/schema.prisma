@@ -136,6 +136,9 @@ model User {
   dealsAsOwner      Deal[]      @relation("OwnerDeals")
   dealsAsTenant     Deal[]      @relation("TenantDeals")
 
+  // Payment relations
+  paymentsPaid      Payment[]   @relation("PaymentsPaid")
+
   // Reports
   reportsSubmitted  Report[]    @relation("ReportSubmitter")
   reportsAgainst    Report[]    @relation("ReportedUser")
@@ -328,9 +331,12 @@ model Deal {
   // Success fee (calculated based on rent slabs)
   successFeeAmount Int?
 
-  // Payment tracking (stub for MVP)
+  // Payment tracking
   paymentStatus   String      @default("PENDING")  // PENDING, PAID, WAIVED
   paymentId       String?     // External payment reference
+  
+  // Payment relation
+  payment         Payment?
 
   completedAt     DateTime?
 
@@ -341,6 +347,100 @@ model Deal {
   @@index([tenantId])
   @@index([propertyId])
   @@index([status])
+}
+
+// ============================================
+// PAYMENT MODELS
+// ============================================
+
+enum PaymentStatus {
+  PENDING
+  INITIATED
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  NET_BANKING
+  UPI
+  WALLET
+  EMI
+}
+
+model Payment {
+  id                  String        @id @default(uuid())
+
+  // Deal reference
+  dealId              String        @unique
+  deal                Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  // User reference (payer)
+  payerId             String
+  payer               User          @relation("PaymentsPaid", fields: [payerId], references: [id], onDelete: Cascade)
+
+  // Payment details
+  amount              Int           // Amount in paise (INR * 100)
+  description         String        // e.g., "Platform Fee for Property ABC - ₹1000"
+  
+  // Razorpay integration
+  razorpayOrderId     String?       // Order ID from Razorpay
+  razorpayPaymentId   String?       // Payment ID from Razorpay
+  razorpaySignature   String?       // Signature for verification
+
+  // Payment status
+  status              PaymentStatus @default(PENDING)
+  method              PaymentMethod?
+
+  // Metadata
+  notes               String?       // JSON string for additional data
+  receiptId           String?       // Receipt reference
+
+  // Timestamps
+  initiatedAt         DateTime?
+  completedAt         DateTime?
+  failedAt            DateTime?
+  refundedAt          DateTime?
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relations
+  logs                PaymentLog[]
+
+  @@index([dealId])
+  @@index([payerId])
+  @@index([status])
+  @@index([razorpayOrderId])
+  @@index([razorpayPaymentId])
+  @@index([createdAt])
+}
+
+model PaymentLog {
+  id                String    @id @default(uuid())
+
+  paymentId         String
+  payment           Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  // Event logging
+  event             String    // e.g., "PAYMENT_INITIATED", "PAYMENT_COMPLETED", "WEBHOOK_RECEIVED"
+  status            String    // Event status
+  
+  // Razorpay webhook data
+  razorpayData      String?   // JSON string of webhook data
+  
+  // Error tracking
+  errorMessage      String?
+  errorCode         String?
+
+  createdAt         DateTime  @default(now())
+
+  @@index([paymentId])
+  @@index([event])
+  @@index([createdAt])
 }
 
 model Report {

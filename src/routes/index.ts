@@ -5,6 +5,7 @@ import chatRoutes from './chat.routes';
 import dealRoutes from './deal.routes';
 import reportRoutes from './report.routes';
 import adminRoutes from './admin.routes';
+import paymentRoutes from './payment.routes';
 
 const router = Router();
 
@@ -20,5 +21,7 @@ router.use('/conversations', chatRoutes);
 router.use('/deals', dealRoutes);
 router.use('/reports', reportRoutes);
 router.use('/admin', adminRoutes);
+router.use('/payments', paymentRoutes);
 
 export default router;
+
