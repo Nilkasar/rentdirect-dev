@@ -101,3 +101,52 @@ export interface StartConversationDto {
   propertyId: string;
   message: string;
 }
+
+// Payment DTOs
+export interface CreatePaymentOrderDto {
+  dealId: string;
+  amount: number;
+  description: string;
+  payerId: string;
+  email: string;
+  phone: string;
+  userName: string;
+}
+
+export interface VerifyPaymentDto {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+  dealId: string;
+}
+
+export interface PaymentOrderResponse {
+  orderId: string;
+  amount: number;
+  amountInPaise: number;
+  currency: string;
+  customerId?: string;
+  receipt: string;
+}
+
+export interface PaymentData {
+  id: string;
+  dealId: string;
+  payerId: string;
+  amount: number;
+  description: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  status: 'PENDING' | 'INITIATED' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+  method?: string;
+  notes?: string;
+  receiptId?: string;
+  initiatedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  refundedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+

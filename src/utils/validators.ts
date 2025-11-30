@@ -117,3 +117,39 @@ export const isValidRentAmount = (amount: number): boolean => {
 export const isValidDepositAmount = (deposit: number, rent: number): boolean => {
   return deposit >= 0 && deposit <= rent * 12; // Max 12 months rent
 };
+
+/**
+ * Validate payment amount (in INR)
+ */
+export const isValidPaymentAmount = (amount: number): boolean => {
+  // Minimum ₹1 (1 paise in our system), Maximum ₹10,00,000 (10 lakhs)
+  return amount >= 1 && amount <= 10000000;
+};
+
+/**
+ * Validate Razorpay Order ID format
+ */
+export const isValidRazorpayOrderId = (orderId: string): boolean => {
+  // Razorpay order IDs start with 'order_' followed by alphanumeric characters
+  const orderIdRegex = /^order_[A-Za-z0-9]{1,}$/;
+  return orderIdRegex.test(orderId);
+};
+
+/**
+ * Validate Razorpay Payment ID format
+ */
+export const isValidRazorpayPaymentId = (paymentId: string): boolean => {
+  // Razorpay payment IDs start with 'pay_' followed by alphanumeric characters
+  const paymentIdRegex = /^pay_[A-Za-z0-9]{1,}$/;
+  return paymentIdRegex.test(paymentId);
+};
+
+/**
+ * Validate Razorpay Signature format
+ */
+export const isValidRazorpaySignature = (signature: string): boolean => {
+  // Razorpay signatures are 64 character hex strings (SHA256 hash)
+  const signatureRegex = /^[a-f0-9]{64}$/;
+  return signatureRegex.test(signature);
+};
+

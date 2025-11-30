@@ -36,6 +36,13 @@ export const config = {
     length: 6,
   },
 
+  // Razorpay Payment Gateway Configuration
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+  },
+
   // Success fee slabs (in INR)
   successFeeSlabs: [
     { maxRent: 10000, fee: 299 },
