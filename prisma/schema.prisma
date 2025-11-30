@@ -1,0 +1,467 @@
+// Prisma Schema for Rental Platform
+// No Broker - Direct Owner Contact
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  SUPER_ADMIN
+  OWNER
+  TENANT
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum PropertyType {
+  FLAT
+  PG
+  INDEPENDENT_HOUSE
+  SHARED_ROOM
+}
+
+enum PropertyStatus {
+  DRAFT
+  ACTIVE
+  RENTED
+  SUSPENDED
+}
+
+enum FurnishingStatus {
+  FULLY_FURNISHED
+  SEMI_FURNISHED
+  UNFURNISHED
+}
+
+enum TenantPreference {
+  STUDENTS
+  WORKING_PROFESSIONALS
+  FAMILY
+  ANY
+}
+
+enum RoomConfig {
+  SINGLE_ROOM
+  ONE_RK
+  ONE_BHK
+  TWO_BHK
+  THREE_BHK
+  THREE_PLUS_BHK
+  SHARED
+}
+
+enum DealStatus {
+  PENDING_OWNER
+  PENDING_TENANT
+  PENDING_BOTH
+  COMPLETED
+  CANCELLED
+}
+
+enum ReportType {
+  SPAM
+  SCAM
+  INAPPROPRIATE
+  FAKE_LISTING
+  ABUSIVE_BEHAVIOR
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model User {
+  id                String      @id @default(uuid())
+  email             String      @unique
+  password          String
+  role              UserRole
+  status            UserStatus  @default(ACTIVE)
+
+  // Profile fields
+  firstName         String
+  lastName          String
+  phone             String?
+  profileImage      String?
+
+  // KYC placeholders (for future integration)
+  aadhaarNumber     String?     // Stored encrypted in production
+  panNumber         String?     // Stored encrypted in production
+  kycVerified       Boolean     @default(false)
+
+  // 2FA for admin (simplified)
+  twoFactorEnabled  Boolean     @default(false)
+  twoFactorSecret   String?
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  lastLoginAt       DateTime?
+
+  // Relations
+  properties        Property[]  @relation("OwnerProperties")
+  bookmarks         Bookmark[]
+
+  // Chat relations
+  conversationsAsOwner   Conversation[] @relation("OwnerConversations")
+  conversationsAsTenant  Conversation[] @relation("TenantConversations")
+  messagesSent           Message[]
+
+  // Deal relations
+  dealsAsOwner      Deal[]      @relation("OwnerDeals")
+  dealsAsTenant     Deal[]      @relation("TenantDeals")
+
+  // Reports
+  reportsSubmitted  Report[]    @relation("ReportSubmitter")
+  reportsAgainst    Report[]    @relation("ReportedUser")
+
+  // OTPs
+  otps              OTP[]
+
+  @@index([role])
+  @@index([status])
+  @@index([email])
+}
+
+model Property {
+  id                String          @id @default(uuid())
+
+  // Owner relation
+  ownerId           String
+  owner             User            @relation("OwnerProperties", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Basic info
+  title             String
+  description       String
+
+  // Location
+  city              String
+  locality          String
+  address           String
+  pincode           String?
+  latitude          Float?
+  longitude         Float?
+
+  // Property details
+  propertyType      PropertyType
+  roomConfig        RoomConfig
+  furnishing        FurnishingStatus
+
+  // Pricing
+  rentAmount        Int             // Monthly rent in INR
+  depositAmount     Int             // Security deposit in INR
+  maintenanceAmount Int?            // Monthly maintenance (optional)
+
+  // Preferences
+  tenantPreference  TenantPreference[]
+
+  // Features
+  amenities         String[]        // Array of amenity names
+  images            String[]        // Array of image URLs
+
+  // Property specifications
+  squareFeet        Int?
+  bathrooms         Int?
+  balconies         Int?
+  floorNumber       Int?
+  totalFloors       Int?
+  ageOfProperty     Int?            // In years
+  facingDirection   String?
+
+  // Availability
+  availableFrom     DateTime?
+
+  // Status and metrics
+  status            PropertyStatus  @default(DRAFT)
+  viewCount         Int             @default(0)
+
+  // Admin
+  approvedAt        DateTime?
+  approvedBy        String?
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  bookmarks         Bookmark[]
+  conversations     Conversation[]
+  deals             Deal[]
+  reports           Report[]
+
+  @@index([city])
+  @@index([locality])
+  @@index([status])
+  @@index([propertyType])
+  @@index([rentAmount])
+  @@index([ownerId])
+}
+
+model Bookmark {
+  id          String    @id @default(uuid())
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  propertyId  String
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, propertyId])
+  @@index([userId])
+}
+
+model Conversation {
+  id            String    @id @default(uuid())
+
+  // Participants
+  ownerId       String
+  owner         User      @relation("OwnerConversations", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  tenantId      String
+  tenant        User      @relation("TenantConversations", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Property context
+  propertyId    String
+  property      Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  // Status flags
+  isFlagged     Boolean   @default(false)
+  flagReason    String?
+
+  // Phone reveal (owner can choose to reveal)
+  phoneRevealed Boolean   @default(false)
+
+  // Last activity for sorting
+  lastMessageAt DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  messages      Message[]
+  deal          Deal?
+  reports       Report[]
+
+  @@unique([ownerId, tenantId, propertyId])
+  @@index([ownerId])
+  @@index([tenantId])
+  @@index([propertyId])
+}
+
+model Message {
+  id              String        @id @default(uuid())
+
+  conversationId  String
+  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  senderId        String
+  sender          User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  content         String
+  status          MessageStatus @default(SENT)
+
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  deliveredAt     DateTime?
+  readAt          DateTime?
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model Deal {
+  id              String      @id @default(uuid())
+
+  // Property and participants
+  propertyId      String
+  property        Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  ownerId         String
+  owner           User        @relation("OwnerDeals", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  tenantId        String
+  tenant          User        @relation("TenantDeals", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  conversationId  String      @unique
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  // Deal terms
+  agreedRent      Int
+
+  // Confirmation flags
+  ownerConfirmed  Boolean     @default(false)
+  ownerConfirmedAt DateTime?
+
+  tenantConfirmed Boolean     @default(false)
+  tenantConfirmedAt DateTime?
+
+  // Status
+  status          DealStatus  @default(PENDING_BOTH)
+
+  // Success fee (calculated based on rent slabs)
+  successFeeAmount Int?
+
+  // Payment tracking (stub for MVP)
+  paymentStatus   String      @default("PENDING")  // PENDING, PAID, WAIVED
+  paymentId       String?     // External payment reference
+
+  completedAt     DateTime?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([ownerId])
+  @@index([tenantId])
+  @@index([propertyId])
+  @@index([status])
+}
+
+model Report {
+  id              String        @id @default(uuid())
+
+  // Who submitted
+  submittedById   String
+  submittedBy     User          @relation("ReportSubmitter", fields: [submittedById], references: [id], onDelete: Cascade)
+
+  // What is being reported (one of these will be set)
+  reportedUserId  String?
+  reportedUser    User?         @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+
+  propertyId      String?
+  property        Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  conversationId  String?
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  // Report details
+  type            ReportType
+  description     String
+
+  // Admin handling
+  status          ReportStatus  @default(PENDING)
+  adminNotes      String?
+  resolvedAt      DateTime?
+  resolvedBy      String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status])
+  @@index([submittedById])
+}
+
+// Platform configuration (for admin-managed settings)
+model PlatformConfig {
+  id          String    @id @default(uuid())
+  key         String    @unique
+  value       String    // JSON string for complex values
+  description String?
+  updatedAt   DateTime  @updatedAt
+  updatedBy   String?
+}
+
+// City list for the platform
+model City {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  state     String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  @@index([isActive])
+}
+
+// OTP for password reset and email verification
+model OTP {
+  id          String    @id @default(uuid())
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  code        String    // 6-digit OTP code
+  type        OTPType   // PASSWORD_RESET, EMAIL_VERIFICATION
+
+  expiresAt   DateTime
+  usedAt      DateTime?
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([code])
+  @@index([expiresAt])
+}
+
+enum OTPType {
+  PASSWORD_RESET
+  EMAIL_VERIFICATION
+}
+
+// Email notification log
+model EmailLog {
+  id          String      @id @default(uuid())
+
+  to          String      // Recipient email
+  subject     String
+  type        EmailType   // Type of email sent
+
+  // Optional user relation
+  userId      String?
+
+  // Status tracking
+  status      EmailStatus @default(PENDING)
+  sentAt      DateTime?
+  error       String?
+
+  createdAt   DateTime    @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+}
+
+enum EmailType {
+  WELCOME
+  PASSWORD_RESET_OTP
+  PASSWORD_CHANGED
+  NEW_INQUIRY
+  NEW_MESSAGE
+  PHONE_REVEALED
+  DEAL_CREATED
+  DEAL_CONFIRMED
+  DEAL_COMPLETED
+  PROPERTY_APPROVED
+  PROPERTY_REJECTED
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
